@@ -1,2 +1,2 @@
 # CADTattooAlly
-Data access component for a proyect called TattooAlly
+Data access component that goes along with another proyect called TattooAllyConsole
