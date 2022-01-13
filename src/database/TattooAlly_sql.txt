@@ -1,0 +1,84 @@
+drop table "USUARIO";
+
+create table "USUARIO"(
+    "USUARIO_ID" number not null primary key, 
+	"USUARIO_NOMBRE" varchar2 (60 BYTE) not null, 
+	"USUARIO_TLFN" varchar2 (11 BYTE) unique, 
+	"USUARIO_EMAIL" varchar2 (60 BYTE) unique not null, 
+	"USUARIO_ALIAS" varchar2 (60 BYTE) unique not null,
+     constraint "NOMBRE_CC" check("USUARIO_NOMBRE" like '%[^A-Z]%'),
+     constraint "TLFN_CC" check ("USUARIO_TLFN" like '%[^0-9]%'),
+     constraint "EMAIL_CC" check ("USUARIO_EMAIL" like '%___@___%'));
+
+drop table "PUBLICACION";
+
+create table "PUBLICACION"(
+    "PUBLI_ID" number not null, 
+	"PUBLI_INTERACCION" number not null, 
+	"PUBLI_IMAGEN" varchar2 (150 BYTE), 
+	"PUBLI_DESCRIPCION" varchar2 (300 BYTE) not null, 
+	"PUBLI_COMENTARIO" varchar2 (300 BYTE), 
+	"USUARIO_ID" number not null,
+     constraint "USUARIO_ID_FK" foreign key ("USUARIO_ID")
+     references "USUARIO" ("USUARIO_ID"));
+     
+
+create or replace PROCEDURE actualizar_publicacion(publiId number, publiInter number, publiImg varchar, 
+publiDesc varchar, publiCom varchar, usuarioId number)
+is
+BEGIN
+    UPDATE publicacion SET publi_interaccion = publiInter,
+    publi_imagen = publiImg,
+    publi_descripcion = publiDesc,
+    publi_comentario = publiCom,
+    usuario_id = usuarioId
+    WHERE publi_id = publiId;
+END;
+
+create or replace PROCEDURE insertar_usuario(u_nombre varchar, u_tlfn varchar, u_email varchar, u_alias varchar)
+is
+BEGIN
+insert into usuario values
+(SEQ_USUARIO.nextval, u_nombre, u_tlfn, u_email, u_alias);
+END;
+
+create or replace TRIGGER no_cambiar_usuario
+BEFORE UPDATE
+ON publicacion
+FOR EACH ROW
+DECLARE
+    usuario_nuevo usuario.usuario_id%TYPE;
+    usuario_viejo usuario.usuario_id%type;
+BEGIN
+    SELECT usuario_id into usuario_viejo
+    FROM usuario 
+    WHERE usuario_id = :OLD.usuario_id;
+
+    SELECT usuario_id into usuario_nuevo
+    FROM usuario
+    WHERE usuario_id =:NEW.usuario_id;
+
+    IF (usuario_nuevo <> usuario_viejo) then
+    raise_application_error (-20003, 'No se puede cambiar el usuario de la publicación');
+    END IF;
+END;
+
+create or replace TRIGGER no_mas_de_5_publi
+    AFTER INSERT ON publicacion
+DECLARE
+    cantidad number;
+BEGIN
+    SELECT max(cantidad)
+    FROM usuario u, publicacion p
+    WHERE cantidad = ( SELECT u.usuario_id, count(publi_id) as cantidad
+            FROM usuario u, publicacion p
+            WHERE u.usuario_id = p.usuario_id
+            GROUP BY u.usuario_id);
+    
+    IF (cantidad > 5) THEN
+        RAISE_APPLICATION_ERROR (-20004, 'No se pueden insertar más de 5 publicaciones por usuario');
+    END IF;
+END;
+
+CREATE SEQUENCE  "SEQ_PUBLI"  MINVALUE 1 MAXVALUE 999 INCREMENT BY 1 START WITH 1 CACHE 20 NOORDER  CYCLE ;
+ CREATE SEQUENCE "SEQ_USUARIO"  MINVALUE 1 MAXVALUE 999 INCREMENT BY 1 START WITH 1 CACHE 20 NOORDER  NOCYCLE ;
